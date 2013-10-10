@@ -131,6 +131,10 @@ class Pynliner(object):
         If using mod_wgsi, use html5 parsing to prevent BeautifulSoup
         incompatibility.
         """
+        import lxml.html
+        self.soup = lxml.html.fromstring(self.source_string)
+        return
+
         # Check if mod_wsgi is running
         # - see http://code.google.com/p/modwsgi/wiki/TipsAndTricks
         try:
@@ -160,16 +164,21 @@ class Pynliner(object):
         else:
             self.style_string += u'\n'
 
-        link_tags = self.soup.findAll('link', {'rel': 'stylesheet'})
+        link_tags = self.soup.cssselect("link[rel='stylesheet']")
+        # link_tags = self.soup.findAll('link', {'rel': 'stylesheet'})
         for tag in link_tags:
-            url = tag['href']
+            url = tag.attrib.get('href', None)
+            if not url:
+                continue
+            # url = tag['href']
 
             # Convert the relative URL to an absolute URL ready to pass to urllib
             base_url = self.relative_url or self.root_url
             url = urlparse.urljoin(base_url, url)
 
             self.style_string += self._get_url(url)
-            tag.extract()
+            tag.drop_tree()
+            # tag.extract()
 
     def _get_internal_styles(self):
         """Gets <style> element styles
@@ -179,10 +188,13 @@ class Pynliner(object):
         else:
             self.style_string += u'\n'
 
-        style_tags = self.soup.findAll('style')
+        style_tags = self.soup.cssselect('style')
+        # style_tags = self.soup.findAll('style')
         for tag in style_tags:
-            self.style_string += u'\n'.join(tag.contents) + u'\n'
-            tag.extract()
+            self.style_string += u'\n'.join([tag.text, tag.tail]) + u'\n'
+            # self.style_string += u'\n'.join(tag.contents) + u'\n'
+            tag.drop_tree()
+            # tag.extract()
 
     def _get_specificity_from_list(self, lst):
         """
@@ -206,14 +218,15 @@ class Pynliner(object):
         rules = self.stylesheet.cssRules.rulesOfType(1)
         elem_prop_map = {}
         elem_style_map = {}
-
+        
         # build up a property list for every styled element
         for rule in rules:
             # select elements for every selector
             selectors = rule.selectorText.split(',')
             elements = []
             for selector in selectors:
-                elements += select(self.soup, selector)
+                elements += self.soup.cssselect(selector)
+                # elements += select(self.soup, selector)
             # build prop_list for each selected element
             for elem in elements:
                 if elem not in elem_prop_map:
@@ -237,17 +250,22 @@ class Pynliner(object):
 
         # apply rules to elements
         for elem, style_declaration in elem_style_map.items():
-            if elem.has_key('style'):
-                elem['style'] = u'%s; %s' % (style_declaration.cssText.replace('\n', ' '), elem['style'])
+            if 'style' in elem.attrib:
+            # if elem.has_key('style'):
+                elem.attrib['style'] = u'%s; %s' % (style_declaration.cssText.replace('\n', ' '), elem.attrib['style'])
+                # elem['style'] = u'%s; %s' % (style_declaration.cssText.replace('\n', ' '), elem['style'])
             else:
-                elem['style'] = style_declaration.cssText.replace('\n', ' ')
+                elem.attrib['style'] = style_declaration.cssText.replace('\n', ' ')
+                # elem['style'] = style_declaration.cssText.replace('\n', ' ')
         
     def _get_output(self):
         """Generate Unicode string of `self.soup` and set it to `self.output`
 
         Returns self.output
         """
-        self.output = unicode(self.soup)
+        import lxml.html
+        self.output = lxml.html.tostring(self.soup)
+        # self.output = unicode(self.soup)
         return self.output
     
     def _clean_output(self):
