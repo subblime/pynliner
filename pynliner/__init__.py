@@ -155,7 +155,7 @@ class Pynliner(object):
             self.style_string += style_string
         import tinycss
         cssparser = tinycss.make_parser()
-        self.stylesheet = cssparser.parse_stylesheet_bytes(self.style_string)
+        self.stylesheet = cssparser.parse_stylesheet(self.style_string)
         # cssparser = cssutils.CSSParser(log=self.log)
         # self.stylesheet = cssparser.parseString(self.style_string)
 
